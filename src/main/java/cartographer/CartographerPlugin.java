@@ -68,8 +68,9 @@ import cartographer.CoverageFile.*;
     status = PluginStatus.RELEASED,
     packageName = MiscellaneousPluginPackage.NAME,
     category = PluginCategoryNames.ANALYSIS,
-    shortDescription = "Code coverage parser",
-    description = "Plugin for loading and processing code coverage data."
+    servicesRequired = { DecompilerHighlightService.class, ColorizingService.class},
+                            shortDescription = "Code coverage parser",
+            description = "Plugin for loading and processing code coverage data."
 )
 //@formatter:on
 
