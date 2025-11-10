@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Optional;
 
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSpace;
@@ -78,11 +79,11 @@ public class CoverageFile {
     /**
      * Initializes a code coverage file object from an absolute file path.
      * 
-     * @param filename      Absolute path of the code coverage file to analyze
+     * @param filename Absolute path of the code coverage file to analyze
      * 
-     * @throws IOException  If an I/O exception occurred
+     * @throws IOException If an I/O exception occurred
      */
-    public CoverageFile(String filename) throws IOException {
+    public CoverageFile(String filename, Program curProgram) throws IOException {
 
         // Filename without the pathname
         this.filename = filename.substring(filename.lastIndexOf('/') + 1);
@@ -90,46 +91,55 @@ public class CoverageFile {
         // Attempt to open the file
         try (RandomAccessFile reader = new RandomAccessFile(filename, "r")) {
 
-            // Read the first line of the file
-            String headerLine = reader.readLine();
-
-            // Check if this is a DRCOV file
-            if (headerLine.toLowerCase().startsWith("drcov")) {
-
-                type = "drcov";
-
-                // Parse the file
-                parseDrCovFile(reader);
-                statusCode = STATUS.OK;
-            }
-
-            // Check if this is an EZCOV file
-            else if (headerLine.toLowerCase().startsWith("ezcov")) {
-
-                type = "ezcov";
-
-                // Get the version
-                Matcher match = Pattern.compile("^EZCOV VERSION: (.*)").matcher(headerLine);
-                if (match.find()) {
-                    version = Integer.parseInt(match.group(1));
-                }
-                else {
-                    statusCode = STATUS.HEADER_ERROR;
-                    statusMessage = "Unknown EZCOV version. Found [" + headerLine + "]";
-                }
-
-                // Parse the file
-                EzCovModule module = parseEzCovFile(reader);
+            if (filename.endsWith(".greasecov")) {
+                EzCovModule module = parseGREASEFile(reader, curProgram);
                 statusCode = STATUS.OK;
 
                 // Copy module blocks to file blocks
                 blocks = module.getBasicBlocks();
-            }
+            } else {
 
-            // Otherwise throw an error
-            else {
-                statusCode = STATUS.HEADER_ERROR;
-                statusMessage = "Unknown coverage header: [" + headerLine + "]";
+                // Read the first line of the file
+
+                String headerLine = reader.readLine();
+
+                // Check if this is a DRCOV file
+                if (headerLine.toLowerCase().startsWith("drcov")) {
+
+                    type = "drcov";
+
+                    // Parse the file
+                    parseDrCovFile(reader);
+                    statusCode = STATUS.OK;
+                }
+
+                // Check if this is an EZCOV file
+                else if (headerLine.toLowerCase().startsWith("ezcov")) {
+
+                    type = "ezcov";
+
+                    // Get the version
+                    Matcher match = Pattern.compile("^EZCOV VERSION: (.*)").matcher(headerLine);
+                    if (match.find()) {
+                        version = Integer.parseInt(match.group(1));
+                    } else {
+                        statusCode = STATUS.HEADER_ERROR;
+                        statusMessage = "Unknown EZCOV version. Found [" + headerLine + "]";
+                    }
+
+                    // Parse the file
+                    EzCovModule module = parseEzCovFile(reader);
+                    statusCode = STATUS.OK;
+
+                    // Copy module blocks to file blocks
+                    blocks = module.getBasicBlocks();
+                }
+
+                // Otherwise throw an error
+                else {
+                    statusCode = STATUS.HEADER_ERROR;
+                    statusMessage = "Unknown coverage header: [" + headerLine + "]";
+                }
             }
         }
 
@@ -138,26 +148,25 @@ public class CoverageFile {
             throw new AssertionError(e);
         }
     }
-    
+
     /**
      * Copy constructor for a code coverage file.
      * 
-     * @param file  Existing CoverageFile object to copy
+     * @param file Existing CoverageFile object to copy
      */
     public CoverageFile(CoverageFile file) {
-        
+
         // Clone each function
         file.ccFunctionMap.forEach(
-            (function, ccFunc) -> this.ccFunctionMap.put(function, new CoverageFunction(ccFunc))
-        );
+                (function, ccFunc) -> this.ccFunctionMap.put(function, new CoverageFunction(ccFunc)));
     }
 
     /**
      * Parses a DRCOV file.
      * 
-     * @param reader        RandomAccessFile reader for the coverage file
+     * @param reader RandomAccessFile reader for the coverage file
      * 
-     * @throws IOException  If an I/O exception occurred
+     * @throws IOException If an I/O exception occurred
      */
     private void parseDrCovFile(RandomAccessFile reader) throws IOException {
 
@@ -170,20 +179,20 @@ public class CoverageFile {
 
         // Module version
         line = reader.readLine();
-        
+
         // Default to no modules
         int numModules = 0;
-        
+
         // Get the module count and version, if applicable
         Matcher match = Pattern.compile("^Module Table: (?:version (\\d+), count )?(\\d+)$").matcher(line);
-        
+
         // Update strings if any matches were found
         if (match.find()) {
             // Default to version 1 if module table version doesn't exist
             version = Integer.parseInt((match.group(1) != null) ? match.group(1) : "1");
             numModules = Integer.parseInt(match.group(2));
         }
-        
+
         // Skip column names if this wasn't a version 1 DRCOV module set
         if (version > 1) {
             reader.readLine();
@@ -195,7 +204,7 @@ public class CoverageFile {
             // Read each module
             line = reader.readLine();
             String[] moduleData = line.split(",");
-            
+
             // Read the DRCOV module data and add it to the list of modules
             DrCovModule module = parseDrCovModule(moduleData);
             drcovModules.add(module);
@@ -238,9 +247,9 @@ public class CoverageFile {
                 int moduleId = readShort(reader) & 0xFFFF;
 
                 // Make sure the module ID is valid
-                if(moduleId < numModules){
+                if (moduleId < numModules) {
                     // Add the block to the module
-                    drcovModules.get(moduleId).addBlock(offset, size, moduleId);
+                    drcovModules.get(moduleId).addBlock(offset, Optional.of(size), moduleId);
                 }
             }
 
@@ -252,71 +261,71 @@ public class CoverageFile {
                     int moduleId = Integer.parseInt(match.group(1)) & 0xFFFF;
                     int offset = Integer.parseUnsignedInt(match.group(2), 16);
                     short size = Short.parseShort(match.group(3));
-                    
+
                     // Make sure the module ID is valid
-                    if(moduleId < numModules){
+                    if (moduleId < numModules) {
                         // Add the block to the module
-                        drcovModules.get(moduleId).addBlock(offset, size, moduleId);
+                        drcovModules.get(moduleId).addBlock(offset, Optional.of(size), moduleId);
                     }
                 }
             }
         }
-        
+
         // Populate the module list
         populateModules(drcovModules);
     }
-    
+
     /**
      * Parses a DRCOV module.
      * 
-     * @param moduleData    List of module string data
+     * @param moduleData List of module string data
      * 
-     * @return              DRCOV module data
+     * @return DRCOV module data
      */
     private DrCovModule parseDrCovModule(String[] moduleData) {
-        
+
         // Module ID is always at position 0
         int moduleId = Integer.parseInt(moduleData[0].trim());
-        
+
         // File path always comes last
-        String name = moduleData[moduleData.length-1].trim();
-        
+        String name = moduleData[moduleData.length - 1].trim();
+
         // Default parent ID and base position for versions 1 and 2
         int parentId = 0;
         int basePos = 1;
-        
+
         // Process versions 3 and above
         if (version > 2) {
-            
+
             // Versions 3, 4, and 5 all have the parent ID at position 1
             parentId = Integer.parseInt(moduleData[1].trim());
-            
+
             // Version 3 has the base address at position 2
             if (version == 3) {
                 basePos = 2;
             }
-            
+
             // Versions 4 and 5 have the base address at position 5
             else {
                 basePos = 5;
             }
         }
-        
+
         // Get the base address based on its position
         long base = Long.parseUnsignedLong(moduleData[basePos].trim().replace("0x", ""), 16);
-        
+
         // Create and return the DrCovModule from the parsed module entry
         DrCovModule module = new DrCovModule(moduleId, parentId, base, name);
         return module;
     }
-    
+
     /**
      * Populates the map of usable modules with those read from the DRCOV file.
      * 
-     * @param modList  List of DrCovModule objects
+     * @param modList List of DrCovModule objects
      */
     private void populateModules(List<DrCovModule> modList) {
-        
+
         // Loop through each module
         for (DrCovModule module : modList) {
 
@@ -343,12 +352,23 @@ public class CoverageFile {
         }
     }
 
+    private EzCovModule parseGREASEFile(RandomAccessFile reader, Program currentProgrm) throws IOException {
+        EzCovModule module = new EzCovModule();
+        String line = reader.readLine();
+        while (line != null) {
+
+            line = reader.readLine();
+        }
+
+        return module;
+    }
+
     /**
      * Parses an EZCOV file.
      * 
-     * @param reader        RandomAccessFile reader for the coverage file
+     * @param reader RandomAccessFile reader for the coverage file
      * 
-     * @throws IOException  If an I/O exception occurred
+     * @throws IOException If an I/O exception occurred
      */
     private EzCovModule parseEzCovFile(RandomAccessFile reader) throws IOException {
 
@@ -368,7 +388,8 @@ public class CoverageFile {
             }
 
             // Parse the thing
-            Matcher match = Pattern.compile("^\\s*(0x[0-9a-fA-F]+?)\\s*,\\s*(\\d+)\\s*,\\s*\\[ (.*?) \\]").matcher(line);
+            Matcher match = Pattern.compile("^\\s*(0x[0-9a-fA-F]+?)\\s*,\\s*(\\d+)\\s*,\\s*\\[ (.*?) \\]")
+                    .matcher(line);
 
             // Make sure a match was found
             if (match.find()) {
@@ -379,7 +400,7 @@ public class CoverageFile {
                 String addressSpace = match.group(3);
 
                 // Create a block from the data
-                module.addBlock(offset, size, addressSpace);
+                module.addBlock(offset, Optional.of(size), addressSpace);
             }
 
             // Read the next line
@@ -393,11 +414,11 @@ public class CoverageFile {
     /**
      * Reads a 32-bit integer value from the specified file stream.
      * 
-     * @param r             RandomAccessFile to read from
+     * @param r RandomAccessFile to read from
      * 
-     * @return              32-bit integer
+     * @return 32-bit integer
      * 
-     * @throws IOException  If an I/O exception occurred
+     * @throws IOException If an I/O exception occurred
      */
     private int readInt(RandomAccessFile r) throws IOException {
         return r.read() | (r.read() << 8) | (r.read() << 16) | (r.read() << 24);
@@ -406,14 +427,14 @@ public class CoverageFile {
     /**
      * Reads a 16-bit short value from the specified file stream.
      * 
-     * @param r             RandomAccessFile to read from
+     * @param r RandomAccessFile to read from
      * 
-     * @return              16-bit short
+     * @return 16-bit short
      * 
-     * @throws IOException  If an I/O exception occurred
+     * @throws IOException If an I/O exception occurred
      */
     private short readShort(RandomAccessFile r) throws IOException {
-        return (short)(r.read() | (r.read() << 8));
+        return (short) (r.read() | (r.read() << 8));
     }
 
     /**
@@ -421,7 +442,7 @@ public class CoverageFile {
      */
     public class CodeCoverageModule {
         private List<BasicBlock> basicBlocks = new ArrayList<>();
-        
+
         public List<BasicBlock> getBasicBlocks() {
             return basicBlocks;
         }
@@ -440,10 +461,10 @@ public class CoverageFile {
         /**
          * Constructor for a DRCOV module.
          * 
-         * @param moduleId  Module ID 
-         * @param parentId  Parent module ID
-         * @param base      Base memory address
-         * @param name      Name of the file
+         * @param moduleId Module ID
+         * @param parentId Parent module ID
+         * @param base     Base memory address
+         * @param name     Name of the file
          */
         public DrCovModule(int moduleId, int parentId, long base, String name) {
             this.moduleId = moduleId;
@@ -455,11 +476,11 @@ public class CoverageFile {
         /**
          * Adds a block to the DRCOV module.
          * 
-         * @param offset  Offset of the block from the module's base address
-         * @param size    Size of the block in bytes
-         * @param module  Module ID
+         * @param offset Offset of the block from the module's base address
+         * @param size   Size of the block in bytes
+         * @param module Module ID
          */
-        private void addBlock(long offset, short size, int module) {
+        private void addBlock(long offset, Optional<Short> size, int module) {
             BasicBlock basicBlock = new BasicBlock(offset, size, module);
             this.getBasicBlocks().add(basicBlock);
         }
@@ -480,11 +501,11 @@ public class CoverageFile {
         /**
          * Adds a block to the EZCOV module.
          * 
-         * @param offset        Memory offset of the block
-         * @param size          Size of the block in bytes
-         * @param addressSpace  Address space of the block
+         * @param offset       Memory offset of the block
+         * @param size         Size of the block in bytes
+         * @param addressSpace Address space of the block
          */
-        private void addBlock(long offset, short size, String addressSpace) {
+        private void addBlock(long offset, Optional<Short> size, String addressSpace) {
             BasicBlock basicBlock = new BasicBlock(offset, size, addressSpace);
             this.getBasicBlocks().add(basicBlock);
         }
@@ -495,18 +516,18 @@ public class CoverageFile {
      */
     public class BasicBlock {
         private long offset;
-        private short size;
+        private Optional<Short> size;
         private int moduleId;
         private AddressSpace addressSpace;
 
         /**
          * Constructor for a basic block using a module ID.
          * 
-         * @param offset    Memory offset of the block
-         * @param size      Size of the block in bytes
-         * @param moduleId  Module ID
+         * @param offset   Memory offset of the block
+         * @param size     Size of the block in bytes
+         * @param moduleId Module ID
          */
-        public BasicBlock(long offset, short size, int moduleId) {
+        public BasicBlock(long offset, Optional<Short> size, int moduleId) {
             this.offset = offset;
             this.size = size;
             this.moduleId = moduleId;
@@ -515,25 +536,30 @@ public class CoverageFile {
         /**
          * Constructor for a basic block using an address space.
          * 
-         * @param offset        Memory offset of the block
-         * @param size          Size of the block in bytes
-         * @param addressSpace  Address space of the block
+         * @param offset       Memory offset of the block
+         * @param size         Size of the block in bytes
+         * @param addressSpace Address space of the block
          */
-        public BasicBlock(long offset, short size, String addressSpace) {
+        public BasicBlock(long offset, Optional<Short> size, String addressSpace) {
             this.offset = offset;
             this.size = size;
             this.addressSpace = CartographerPlugin.getAddressSpace(addressSpace);
         }
 
+        public BasicBlock(long offset) {
+            this.offset = offset;
+            this.size = Optional.empty();
+        }
+
         /**
          * Constructor for a generic basic block.
          * 
-         * @param offset  Memory offset of the block
-         * @param size    Size of the block in bytes
+         * @param offset Memory offset of the block
+         * @param size   Size of the block in bytes
          */
         public BasicBlock(long offset, short size) {
             this.offset = offset;
-            this.size = size;
+            this.size = Optional.of(size);
         }
     }
 
@@ -543,14 +569,14 @@ public class CoverageFile {
     public String toString() {
         return this.alphaId + " (" + this.filename + ")";
     }
-    
+
     /**
      * Populates the block entries for the coverage function.
      * 
-     * @param program  Current program being analyzed
+     * @param program Current program being analyzed
      */
     public void populateBlocks(Program program) {
-        
+
         // Loop through each basic block
         for (BasicBlock block : this.blocks) {
 
@@ -585,178 +611,178 @@ public class CoverageFile {
 
                 // Add the current execution address to the list of blocks hit
                 CoverageFunction ccFunc = this.ccFunctionMap.get(checkFunction);
-                ccFunc.addCoverageBlock(address, Integer.valueOf(block.size));
+                ccFunc.addCoverageBlock(address, block.size);
             }
         }
     }
-    
+
     /**
      * Gets the detected type of the coverage file.
      * 
-     * @return  Type of coverage file
+     * @return Type of coverage file
      */
     public String getType() {
         return type;
     }
-    
+
     /**
      * Gets the detected version of the coverage file.
      * 
-     * @return  Version of coverage file
+     * @return Version of coverage file
      */
     public int getVersion() {
         return version;
     }
-    
+
     /**
      * Gets the list of loaded modules.
      * 
-     * @return  Hashmap of modules
+     * @return Hashmap of modules
      */
     public Map<String, DrCovModule> getModules() {
         return modules;
     }
-    
+
     /**
      * Gets a specified module by name.
      * 
-     * @param moduleName  Name of the module
+     * @param moduleName Name of the module
      * 
-     * @return            Module with the associated name
+     * @return Module with the associated name
      */
     public DrCovModule getModule(String moduleName) {
         return modules.get(moduleName);
     }
-    
+
     /**
      * Gets the list of loaded basic blocks.
      * 
-     * @return  List of basic blocks
+     * @return List of basic blocks
      */
     public List<BasicBlock> getBlocks() {
         return blocks;
     }
-    
+
     /**
      * Sets the list of blocks to the specified list.
      * 
-     * @param blocks  List of basic blocks
+     * @param blocks List of basic blocks
      */
     public void setBlocks(List<BasicBlock> blocks) {
         this.blocks = blocks;
     }
-    
+
     /**
      * Gets the status code.
      * 
-     * @return  Status code
+     * @return Status code
      */
     public STATUS getStatusCode() {
         return statusCode;
     }
-    
+
     /**
      * Gets the status message.
      * 
-     * @return  Status message
+     * @return Status message
      */
     public String getStatusMessage() {
         return statusMessage;
     }
-    
+
     /**
      * Gets the filename of the coverage file.
      * 
-     * @return  Name of the coverage file
+     * @return Name of the coverage file
      */
     public String getFilename() {
         return filename;
     }
-    
+
     /**
      * Gets the unique ID of the coverage file.
      * 
-     * @return  ID of the coverage file
+     * @return ID of the coverage file
      */
     public int getId() {
         return id;
     }
-    
+
     /**
      * Sets the ID of the coverage file to the specified value.
      * 
-     * @param id  Integer to use for the file's ID
+     * @param id Integer to use for the file's ID
      */
     public void setId(int id) {
         this.id = id;
     }
-    
+
     /**
      * Gets the unique mnemonic ID of the coverage file.
      * 
-     * @return  Mnemonic ID of the coverage file
+     * @return Mnemonic ID of the coverage file
      */
     public String getAlphaId() {
         return alphaId;
     }
-    
+
     /**
      * Sets the mnemonic ID of the coverage file to the specified value.
      * 
-     * @param id  String to use for the file's mnemonic ID
+     * @param id String to use for the file's mnemonic ID
      */
     public void setAlphaId(String id) {
         this.alphaId = id;
     }
-    
+
     /**
      * Gets the model used by the coverage file.
      * 
-     * @return  Model used by the coverage file
+     * @return Model used by the coverage file
      */
     public CartographerModel getModel() {
         return model;
     }
-    
+
     /**
      * Sets the model for the coverage file.
      * 
-     * @param model  Model to use for the file
+     * @param model Model to use for the file
      */
     public void setModel(CartographerModel model) {
         this.model = model;
     }
-    
+
     /**
      * Gets a list of the coverage functions associated with the coverage file.
      * 
-     * @return  Hashmap of coverage functions
+     * @return Hashmap of coverage functions
      */
     public Map<Function, CoverageFunction> getCoverageFunctions() {
         return ccFunctionMap;
     }
-    
+
     /**
      * Gets a specific coverage function identified by its Ghidra function.
      * 
-     * @param fn  Ghidra function
+     * @param fn Ghidra function
      * 
-     * @return    Coverage function
+     * @return Coverage function
      */
     public CoverageFunction getCoverageFunction(Function fn) {
         return ccFunctionMap.get(fn);
     }
-    
+
     /**
      * Adds a coverage function to the list of coverage functions.
      * 
-     * @param fn      Ghidra function
-     * @param ccFunc  Coverage function
+     * @param fn     Ghidra function
+     * @param ccFunc Coverage function
      */
     public void addCoverageFunction(Function fn, CoverageFunction ccFunc) {
         ccFunctionMap.put(fn, ccFunc);
     }
-    
+
     /**
      * Clears the coverage function list.
      */

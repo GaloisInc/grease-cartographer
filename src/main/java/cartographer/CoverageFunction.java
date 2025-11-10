@@ -34,6 +34,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Represents a function with populated code coverage data.
@@ -53,7 +55,7 @@ public class CoverageFunction {
     /**
      * Constructor for a code coverage function.
      * 
-     * @param fn  Ghidra function
+     * @param fn Ghidra function
      */
     public CoverageFunction(Function fn) {
 
@@ -69,11 +71,11 @@ public class CoverageFunction {
         // Ensure initial processing occurs
         processed = false;
     }
-    
+
     /**
      * Copy constructor for code coverage functions.
      * 
-     * @param ccFunc  Existing CoverageFunction object to copy
+     * @param ccFunc Existing CoverageFunction object to copy
      */
     public CoverageFunction(CoverageFunction ccFunc) {
         function = ccFunc.function;
@@ -84,15 +86,14 @@ public class CoverageFunction {
         totalInstructions = ccFunc.totalInstructions;
         blocksHit = new ArrayList<>();
         instructionsHit = ccFunc.instructionsHit;
-        
+
         // Don't do any processing on copied objects
         processed = true;
-        
+
         // Populate the coverage block entries
         ccFunc.ccBlockEntries.forEach(
-            (offset, size) -> ccBlockEntries.put(offset, size)
-        );
-        
+                (offset, size) -> ccBlockEntries.put(offset, size));
+
         // Populate the blocks hit
         for (int i = 0; i < ccFunc.blocksHit.size(); i++) {
             this.blocksHit.add(ccFunc.blocksHit.get(i));
@@ -119,8 +120,7 @@ public class CoverageFunction {
         CodeBlockIterator fnBlocks;
         try {
             fnBlocks = blockModel.getCodeBlocksContaining(body, TaskMonitor.DUMMY);
-        }
-        catch (CancelledException e) {
+        } catch (CancelledException e) {
             return;
         }
 
@@ -173,120 +173,129 @@ public class CoverageFunction {
         // Indicate that model processing has finished
         processed = true;
     }
-    
+
     /**
      * Gets the Ghidra function associated with this coverage function.
      * 
-     * @return  Ghidra function
+     * @return Ghidra function
      */
     public Function getFunction() {
         return function;
     }
-    
+
     /**
      * Gets the entry point of the function.
      * 
-     * @return  Address of the function's entry point
+     * @return Address of the function's entry point
      */
     public Address getEntryPoint() {
         return entryPoint;
     }
-    
+
     /**
      * Gets the list of coverage blocks for the function.
      * 
-     * @return  Hashmap of coverage blocks
+     * @return Hashmap of coverage blocks
      */
     public Map<Address, Integer> getCoverageBlocks() {
         return ccBlockEntries;
     }
-    
+
     /**
      * Adds a coverage block to the list of coverage block entries.
      * 
-     * @param address  Address of the coverage block
-     * @param size     Size of the coverage block
+     * @param address Address of the coverage block
+     * @param size    Size of the coverage block
      */
-    public void addCoverageBlock(Address address, Integer size) {
-        ccBlockEntries.put(address, size);
+    public void addCoverageBlock(Address address, Optional<Short> size) {
+        var insn = this.function.getProgram().getListing().getInstructionAt(address);
+        Integer finalSize = 0;
+        if (size.isEmpty()) {
+            if (!Objects.isNull(insn)) {
+                finalSize = insn.getLength();
+            }
+        } else {
+            finalSize = Integer.valueOf(size.get());
+        }
+        ccBlockEntries.put(address, finalSize);
     }
-    
+
     /**
      * Gets the total number of basic blocks in the function.
      * 
-     * @return  Number of basic blocks
+     * @return Number of basic blocks
      */
     public long getTotalBlocks() {
         return totalBlocks;
     }
-    
+
     /**
      * Gets the total number of instructions in the function.
      * 
-     * @return  Number of instructions
+     * @return Number of instructions
      */
     public long getTotalInstructions() {
         return totalInstructions;
     }
-    
+
     /**
      * Gets the list of code blocks that were hit inside the function.
      * 
-     * @return  List of CodeBlock objects
+     * @return List of CodeBlock objects
      */
     public List<CodeBlock> getBlocksHit() {
         return blocksHit;
     }
-    
+
     /**
      * Adds a block to the list of blocks hit.
      * 
-     * @param block  CodeBlock to add to the hit list
+     * @param block CodeBlock to add to the hit list
      */
     public void addBlockHit(CodeBlock block) {
         blocksHit.add(block);
     }
-    
+
     /**
      * Removes a block from the list of blocks hit.
      * 
-     * @param block  CodeBlock to remove from the hit list
+     * @param block CodeBlock to remove from the hit list
      */
     public void removeBlockHit(CodeBlock block) {
         blocksHit.remove(block);
     }
-    
+
     /**
      * Gets the number of instructions that were hit inside the function.
      * 
-     * @return  Number of executed instructions
+     * @return Number of executed instructions
      */
     public long getInstructionsHit() {
         return instructionsHit;
     }
-    
+
     /**
      * Sets the number of instructions that were hit inside the function.
      * 
-     * @param count  Number of executed instructions
+     * @param count Number of executed instructions
      */
     public void setInstructionsHit(long count) {
         instructionsHit = count;
     }
-    
+
     /**
      * Gets the size of the function in bytes
      * 
-     * @return  Byte count of the function
+     * @return Byte count of the function
      */
     public long getFunctionSize() {
         return functionSize;
     }
-    
+
     /**
      * Checks whether the coverage function has been processed.
      * 
-     * @return  True if the coverage function has been processed, false if not
+     * @return True if the coverage function has been processed, false if not
      */
     public boolean isProcessed() {
         return processed;

@@ -79,14 +79,14 @@ import cartographer.CoverageFile.*;
  */
 public class CartographerPlugin extends ProgramPlugin {
 
-    private Address prevFunctionAddress;                // Previous location
-    private FieldPanel fieldPanel;                      // Decompiler field panel
-    private ClangLayoutController layoutController;     // Decompiler panel layout controller
-    private boolean loaded;                             // Whether code coverage has been loaded
-    private boolean updating;                           // Whether decompiler is updating
-    private DecompilerCallbackHandler callbackHandler;  // Generic decompiler callback handler
-    private ProgramLocation curLocation;                // Current location within the program
-    private CartographerProvider provider;              // Code coverage provider
+    private Address prevFunctionAddress; // Previous location
+    private FieldPanel fieldPanel; // Decompiler field panel
+    private ClangLayoutController layoutController; // Decompiler panel layout controller
+    private boolean loaded; // Whether code coverage has been loaded
+    private boolean updating; // Whether decompiler is updating
+    private DecompilerCallbackHandler callbackHandler; // Generic decompiler callback handler
+    private ProgramLocation curLocation; // Current location within the program
+    private CartographerProvider provider; // Code coverage provider
 
     // Name of the DockingAction group
     private static final String TOOL_GROUP_NAME = "Code Coverage";
@@ -104,7 +104,7 @@ public class CartographerPlugin extends ProgramPlugin {
     /**
      * Constructor for the plugin.
      * 
-     * @param tool  Tool where the plugin will be added
+     * @param tool Tool where the plugin will be added
      */
     public CartographerPlugin(PluginTool tool) {
         super(tool);
@@ -118,7 +118,7 @@ public class CartographerPlugin extends ProgramPlugin {
         createActions();
 
         // Get the decompiler service from the current tool
-        DecompilerProvider decompilerService = (DecompilerProvider)tool.getService(DecompilerHighlightService.class);
+        DecompilerProvider decompilerService = (DecompilerProvider) tool.getService(DecompilerHighlightService.class);
 
         // Get the decompiler controller from the service
         DecompilerController controller = decompilerService.getController();
@@ -142,7 +142,7 @@ public class CartographerPlugin extends ProgramPlugin {
         updating = false;
 
         // Get the existing callback handler for the decompiler controller
-        callbackHandler = (DecompilerCallbackHandler)TestUtils.getInstanceField("callbackHandler", controller);
+        callbackHandler = (DecompilerCallbackHandler) TestUtils.getInstanceField("callbackHandler", controller);
 
         // Set the callback handler of the decompiler controller
         TestUtils.setInstanceField("callbackHandler", controller, new DecompilerCallbackHandler() {
@@ -278,7 +278,7 @@ public class CartographerPlugin extends ProgramPlugin {
                 if (chooser.wasCancelled()) {
                     return;
                 }
-                
+
                 // Update the previous opened directory
                 Preferences.setProperty(LAST_IMPORT_CODE_COVERAGE_DIRECTORY, selectedFiles.get(0).getAbsolutePath());
 
@@ -287,22 +287,21 @@ public class CartographerPlugin extends ProgramPlugin {
                 for (AddressSpace space : spaces) {
                     addressSpaceMap.put(space.getName(), space);
                 }
-                
+
                 // Process each selected file
                 selectedFiles.forEach(selected -> {
-    
+
                     // Load the code coverage file
                     CoverageFile file = null;
                     try {
-                        file = new CoverageFile(selected.getAbsolutePath());
-                    }
-                    catch (IOException e) {
+                        file = new CoverageFile(selected.getAbsolutePath(), currentProgram);
+                    } catch (IOException e) {
                         throw new AssertionError(e.getMessage());
                     }
-    
+
                     // Attempt to process the code coverage file
                     if (!processCoverageFile(file)) {
-                    	return;
+                        return;
                     }
                 });
             }
@@ -313,15 +312,15 @@ public class CartographerPlugin extends ProgramPlugin {
 
         // Make it selectable in the "Tools" menu
         coverageAction.setMenuBarData(new MenuData(
-            new String[] {                      // Menu Path
-                ToolConstants.MENU_TOOLS,
-                TOOL_GROUP_NAME,
-                "Load Code Coverage File(s)..."
-            },
-            null,                               // Icon
-            TOOL_GROUP_ID,                      // Menu Group
-            MenuData.NO_MNEMONIC,               // Mnemonic
-            "1"                                 // Menu Subgroup
+                new String[] { // Menu Path
+                        ToolConstants.MENU_TOOLS,
+                        TOOL_GROUP_NAME,
+                        "Load Code Coverage File(s)..."
+                },
+                null, // Icon
+                TOOL_GROUP_ID, // Menu Group
+                MenuData.NO_MNEMONIC, // Mnemonic
+                "1" // Menu Subgroup
         ));
 
         // Add the action to the tool
@@ -357,7 +356,7 @@ public class CartographerPlugin extends ProgramPlugin {
     /**
      * Colorizes the decompiler view for the selected function.
      * 
-     * @param ccFunc  Code coverage data for the current function
+     * @param ccFunc Code coverage data for the current function
      */
     private void colorizeDecompiler(CoverageFunction ccFunc) {
 
@@ -430,7 +429,7 @@ public class CartographerPlugin extends ProgramPlugin {
     /**
      * Colorizes the lines in the listing (disassembly) view.
      * 
-     * @param file  Coverage file to be processed
+     * @param file Coverage file to be processed
      */
     public void colorizeListing(CoverageFile file) {
 
@@ -470,9 +469,9 @@ public class CartographerPlugin extends ProgramPlugin {
     /**
      * Loads the given code coverage file.
      * 
-     * @param file  Coverage file to load
+     * @param file Coverage file to load
      * 
-     * @return      True if successfully loaded coverage file, false if not
+     * @return True if successfully loaded coverage file, false if not
      */
     public boolean loadCoverageFile(CoverageFile file) {
 
@@ -514,15 +513,14 @@ public class CartographerPlugin extends ProgramPlugin {
             }
 
             // Ask the user which module to use
-            String response = (String)JOptionPane.showInputDialog(
-                null,
-                "Please select the code coverage module to use.",
-                "Select a Coverage Module",
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                modNames.toArray(),
-                modNames.get(0)
-            );
+            String response = (String) JOptionPane.showInputDialog(
+                    null,
+                    "Please select the code coverage module to use.",
+                    "Select a Coverage Module",
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    modNames.toArray(),
+                    modNames.get(0));
 
             // Bail if no option was chosen
             if (response == null) {
@@ -543,9 +541,8 @@ public class CartographerPlugin extends ProgramPlugin {
         // Unsupported type
         else {
             Utils.showError(
-                file.getStatusCode().toString(),
-                file.getStatusMessage()
-            );
+                    file.getStatusCode().toString(),
+                    file.getStatusMessage());
             return false;
         }
 
@@ -565,22 +562,21 @@ public class CartographerPlugin extends ProgramPlugin {
 
         return true;
     }
-    
+
     /**
      * Processes the given code coverage file.
      * 
-     * @param file  Coverage file to process
+     * @param file Coverage file to process
      * 
-     * @return      Whether or not the coverage file was successfully processed
+     * @return Whether or not the coverage file was successfully processed
      */
     public boolean processCoverageFile(CoverageFile file) {
-    	
-    	// Only process if no errors were encountered
-        if (file.getStatusCode() != CoverageFile.STATUS.OK) { 
+
+        // Only process if no errors were encountered
+        if (file.getStatusCode() != CoverageFile.STATUS.OK) {
             Utils.showError(
-                file.getStatusCode().toString(),
-                file.getStatusMessage()
-            );
+                    file.getStatusCode().toString(),
+                    file.getStatusMessage());
             return false;
         }
 
@@ -591,7 +587,7 @@ public class CartographerPlugin extends ProgramPlugin {
 
         // Set the selected file for the provider
         provider.setSelectedFile(file);
-        
+
         // Set to loaded
         loaded = true;
 
@@ -608,7 +604,7 @@ public class CartographerPlugin extends ProgramPlugin {
 
         // Add the file data to the list of loaded files
         loadedFiles.put(file.getId(), file);
-        
+
         // Successfully processed
         return true;
     }
@@ -616,7 +612,7 @@ public class CartographerPlugin extends ProgramPlugin {
     /**
      * Gets the provider for the plugin.
      * 
-     * @return  Plugin provider
+     * @return Plugin provider
      */
     public CartographerProvider getProvider() {
         return provider;
@@ -625,7 +621,7 @@ public class CartographerPlugin extends ProgramPlugin {
     /**
      * Sets the highlight color for the Decompiler view.
      * 
-     * @param color  Color to use for decompilation highlighting
+     * @param color Color to use for decompilation highlighting
      */
     public void setDecompilerHighlightColor(Color color) {
         fieldPanel.setHighlightColor(color);
@@ -646,22 +642,22 @@ public class CartographerPlugin extends ProgramPlugin {
         super.dispose();
         provider.dispose();
     }
-    
+
     /**
      * Gets an address space by its name.
      * 
-     * @param addressSpaceName  Name of the address space
+     * @param addressSpaceName Name of the address space
      * 
-     * @return                  Address space associated with the given name
+     * @return Address space associated with the given name
      */
     public static AddressSpace getAddressSpace(String addressSpaceName) {
         return addressSpaceMap.get(addressSpaceName);
     }
-    
+
     /**
      * Gets the list of currently-loaded files.
      * 
-     * @return  Hashmap of loaded files
+     * @return Hashmap of loaded files
      */
     public static Map<Integer, CoverageFile> getLoadedFiles() {
         return loadedFiles;
