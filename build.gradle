@@ -51,12 +51,16 @@ repositories {
 	// Declare dependency repositories here.  This is not needed if dependencies are manually 
 	// dropped into the lib/ directory.
 	// See https://docs.gradle.org/current/userguide/declaring_repositories.html for more info.
-	// Ex: mavenCentral()
+	mavenCentral()
 }
 
 dependencies {
 	// Any external dependencies added here will automatically be copied to the lib/ directory when
 	// this extension is built.	
+
+	implementation group: 'tools.jackson.core', name: 'jackson-core', version: '3.0.2'
+	implementation group: 'tools.jackson.core', name: 'jackson-databind', version: '3.0.2'
+	testRuntimeOnly files("lib")
 }
 
 // Exclude additional files from the built extension
