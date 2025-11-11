@@ -27,6 +27,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Optional;
 
+import ghidra.app.util.bin.format.elf.ElfException;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSpace;
 import ghidra.program.model.listing.Function;
@@ -352,12 +353,19 @@ public class CoverageFile {
         }
     }
 
-    private EzCovModule parseGREASEFile(RandomAccessFile reader, Program currentProgrm) throws IOException {
+    private EzCovModule parseGREASEFile(RandomAccessFile reader, Program currentProgram)
+            throws IOException, ElfException {
         EzCovModule module = new EzCovModule();
+        // First line should be the section map
         String line = reader.readLine();
+        var covMapper = new GREASECovJson(line, currentProgram);
         while (line != null) {
-
             line = reader.readLine();
+            var addr = GREASECovJson.parseAddr(line);
+            var mbGhidraAddr = covMapper.GREASEMemAddrToMaybeAddr(addr);
+            if (mbGhidraAddr.isPresent()) {
+                module.addBlock(mbGhidraAddr.get().getOffset(), null, line);
+            }
         }
 
         return module;
