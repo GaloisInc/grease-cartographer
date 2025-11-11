@@ -6,6 +6,7 @@ import java.math.BigInteger;
 import java.nio.file.AccessMode;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.TreeMap;
 
 import ghidra.app.util.bin.FileByteProvider;
@@ -15,6 +16,7 @@ import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryBlock;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
+import ghidra.program.model.address.Address;
 
 public class GREASECovJson {
     private HashMap<Long, TreeMap<Long, MemoryBlock>> regionToBlockOffset;
@@ -50,6 +52,34 @@ public class GREASECovJson {
                 }
             }
         }
+    }
+
+    public Optional<Address> GREASEMemAddrToMaybeAddr(GREASEMemAddr gaddr) {
+        if (!regionToBlockOffset.containsKey(gaddr.region_index)) {
+            return Optional.empty();
+        }
+
+        var offMap = regionToBlockOffset.get(gaddr.region_index);
+        var ent = offMap.floorEntry(gaddr.region_offset);
+        if (ent == null) {
+            return Optional.empty();
+        }
+
+        // We need to compute the offset into the block. That is the
+        // (region_offset-section_mem_addr)
+        // We add that to the base of the block to get the Ghidra address
+        // Then we need to check that the address is in bounds
+        var maybeAddress = ent.getValue().getStart().add(gaddr.region_offset - ent.getKey());
+        if (ent.getValue().contains(maybeAddress)) {
+            return Optional.of(maybeAddress);
+        }
+
+        return Optional.empty();
+    }
+
+    public static class BlockInfo {
+        public MemoryBlock block;
+
     }
 
     public static class GREASEMemAddr {
