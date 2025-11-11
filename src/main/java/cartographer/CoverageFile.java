@@ -98,6 +98,7 @@ public class CoverageFile {
 
                 // Copy module blocks to file blocks
                 blocks = module.getBasicBlocks();
+                type = "grease";
             } else {
 
                 // Read the first line of the file
@@ -359,13 +360,14 @@ public class CoverageFile {
         // First line should be the section map
         String line = reader.readLine();
         var covMapper = new GREASECovJson(line, currentProgram);
+        line = reader.readLine();
         while (line != null) {
-            line = reader.readLine();
             var addr = GREASECovJson.parseAddr(line);
             var mbGhidraAddr = covMapper.GREASEMemAddrToMaybeAddr(addr);
             if (mbGhidraAddr.isPresent()) {
                 module.addBlock(mbGhidraAddr.get().getOffset(), null, line);
             }
+            line = reader.readLine();
         }
 
         return module;

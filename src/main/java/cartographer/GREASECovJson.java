@@ -14,6 +14,7 @@ import ghidra.app.util.bin.format.elf.ElfException;
 import ghidra.app.util.bin.format.elf.ElfHeader;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryBlock;
+import ghidra.util.Msg;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import ghidra.program.model.address.Address;
@@ -36,13 +37,18 @@ public class GREASECovJson {
     }
 
     public GREASECovJson(String section_infos, Program prog) throws IOException, ElfException {
-        var sections = parseSectionInfos(section_infos);
+        this.regionToBlockOffset = new HashMap<>();
+        List<GREASESectionInfo> sections = parseSectionInfos(section_infos);
+        Msg.info(this, "done parsing section");
         // TODO: this relies on looking up block by name matching the section name which
         // is usually true
         // but we should use the byte source + section offset to do a more precise
         // mapping to the loaded memory block
         var sectionIndexToName = sectionNameToIndex(prog);
-        for (var sinfo : sections) {
+        Msg.info(this, "done building index");
+        for (GREASESectionInfo sinfo : sections) {
+            Msg.info(this, "first it");
+            Msg.info(this, sectionIndexToName.toString());
             if (sectionIndexToName.containsKey(sinfo.section_index)) {
                 var targetSectionName = sectionIndexToName.get(sinfo.section_index);
                 var potentialBlock = prog.getMemory().getBlock(targetSectionName);
@@ -93,16 +99,14 @@ public class GREASECovJson {
     }
 
     public static GREASEMemAddr parseAddr(String json_arg) {
-        return parseMappaeble(json_arg);
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readValue(json_arg, new TypeReference<GREASEMemAddr>() {
+        });
     }
 
     public static List<GREASESectionInfo> parseSectionInfos(String json_arg) {
-        return parseMappaeble(json_arg);
-    }
-
-    public static <T> T parseMappaeble(String json_arg) {
         ObjectMapper mapper = new ObjectMapper();
-        return mapper.readValue(json_arg, new TypeReference<>() {
+        return mapper.readValue(json_arg, new TypeReference<List<GREASESectionInfo>>() {
         });
     }
 }

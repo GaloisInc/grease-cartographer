@@ -534,8 +534,8 @@ public class CartographerPlugin extends ProgramPlugin {
             file.setBlocks(module.getBasicBlocks());
         }
 
-        else if (file.getType().equals("ezcov")) {
-            // No processing needed for EZCOV files
+        else if (file.getType().equals("ezcov") || file.getType().equals("grease")) {
+            // No processing needed for EZCOV files or GREASE files
         }
 
         // Unsupported type
