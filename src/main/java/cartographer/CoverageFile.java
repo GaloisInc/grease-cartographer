@@ -365,7 +365,7 @@ public class CoverageFile {
             var addr = GREASECovJson.parseAddr(line);
             var mbGhidraAddr = covMapper.GREASEMemAddrToMaybeAddr(addr);
             if (mbGhidraAddr.isPresent()) {
-                module.addBlock(mbGhidraAddr.get().getOffset(), null, line);
+                module.addBlock(mbGhidraAddr.get().getOffset(), Optional.empty(), line);
             }
             line = reader.readLine();
         }
