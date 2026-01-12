@@ -22,7 +22,7 @@ import tools.jackson.databind.ObjectMapper;
 import ghidra.program.model.address.Address;
 
 public class GREASECovJson {
-    private HashMap<Long, TreeMap<Long, MemoryBlock>> regionToBlockOffset;
+    private HashMap<Long, TreeMap<BigInteger, MemoryBlock>> regionToBlockOffset;
 
     private static HashMap<Long, String> sectionNameToIndex(Program prog) throws IOException, ElfException {
         var pth = prog.getExecutablePath();
@@ -51,9 +51,7 @@ public class GREASECovJson {
         // but we should use the byte source + section offset to do a more precise
         // mapping to the loaded memory block
         var sectionIndexToName = sectionNameToIndex(prog);
-        Msg.info(this, "done building index");
         for (GREASESectionInfo sinfo : sections) {
-            Msg.info(this, "first it");
             Msg.info(this, sectionIndexToName.toString());
             if (sectionIndexToName.containsKey(sinfo.section_index)) {
                 var targetSectionName = sectionIndexToName.get(sinfo.section_index);
@@ -82,7 +80,7 @@ public class GREASECovJson {
         // (region_offset-section_mem_addr)
         // We add that to the base of the block to get the Ghidra address
         // Then we need to check that the address is in bounds
-        var maybeAddress = ent.getValue().getStart().add(gaddr.region_offset - ent.getKey());
+        var maybeAddress = ent.getValue().getStart().add(gaddr.region_offset.subtract(ent.getKey()).longValue());
         if (ent.getValue().contains(maybeAddress)) {
             return Optional.of(maybeAddress);
         }
@@ -97,7 +95,7 @@ public class GREASECovJson {
 
     public static class GREASEMemAddr {
         public Long region_index;
-        public Long region_offset;
+        public BigInteger region_offset;
     }
 
     public static class GREASESectionInfo {
