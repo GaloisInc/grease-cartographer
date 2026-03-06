@@ -2,6 +2,12 @@
 
 This README applies to the [GREASE](https://github.com/GaloisInc/grease/branches) extensions to the original [Cartographer plugin](https://github.com/nccgroup/Cartographer/tree/main). The commits in this repository add support for ".greasecov" files generated from the "--dump-coverage" flag from GREASE.  All statements pertain to code introduced by commits after c8160d57f3180f0122c04bc10cbfc3c7baebf991 made by Galois. 
 
+## Installation 
+
+We have added a convenience script for installing the plugin `build_and_install.sh`. The script uses the gradle wrapper to setup the correct version of gradle. THe plugin should be installable by `GHIDRA_INSTALL_DIR=<your install directory for Ghidra> ./build_and_install.sh`. 
+
+You can also still follow the "Building from Source" directions below and install the build zip from the UI instead. 
+
 ## Usage
 
 This plugin extends the load coverage functionality described below with support for GREASE's coverage format. Any file with the extension ".greasecov" will be parsed as a GREASE coverage file. Run GREASE with the "--dump-coverage" flag and then select that file in the load coverage menu described below. 
